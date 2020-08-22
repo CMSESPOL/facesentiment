@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../models/sentiment.dart';
+import '../utils/service.dart';
 import 'shared/customs.dart';
 
 class Capture extends StatefulWidget {
@@ -14,16 +16,23 @@ class Capture extends StatefulWidget {
 class _CaptureState extends State<Capture> {
   GlobalKey<ScaffoldState> _snack = GlobalKey<ScaffoldState>();
   Image _result;
+  double size;
+  Emotion _emotion = Emotion();
+  bool _change = false;
 
-  _takePicture() {
+  _takePicture() async {
+    _change = false;
     _snack.currentState.showSnackBar(SnackBar(
-      content: ActionCapture(onCapture: (file) {
-        if (file != null)
-          _onCapture(Image.file(file));
-        else {
+      content: ActionCapture(width: size, onCapture: (file) async {
+        if (file != null){
+          _onCapture(Image.file(file, width: size,));
+          _emotion = await EmotionApi.instance.emotionReconigtion(file);
+          _change = true;
+          setState(() {});
+        }else {
           Fluttertoast.showToast(
               msg: "Error al obtener la imagen",
-              toastLength: Toast.LENGTH_SHORT,
+              toastLength: Toast.LENGTH_LONG,
               gravity: ToastGravity.BOTTOM);
           _onCapture(null);
         }
@@ -31,7 +40,7 @@ class _CaptureState extends State<Capture> {
     ));
   }
 
-  _onCapture(Image image) {
+  _onCapture(Image image) async {
     setState(() {
       _result = image;
     });
@@ -39,16 +48,16 @@ class _CaptureState extends State<Capture> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size.width * 0.8;
+    size = MediaQuery.of(context).size.width * 0.8;
     return Scaffold(
+      key: _snack,
       body: Container(
-        key: _snack,
         child: Center(
           child: ListView(
             children: <Widget>[
               _result == null ?
                 NotImageFound(size: size)
-              : Container(child: _result, width: size,)
+              : ResultImageValue(size: size, result: _result, emotion: _emotion, change: _change,)
             ],
           ),
         ),
@@ -57,6 +66,54 @@ class _CaptureState extends State<Capture> {
         onPressed: _takePicture,
         child: Icon(Icons.camera),
       ),
+    );
+  }
+}
+
+class ResultImageValue extends StatelessWidget {
+  const ResultImageValue({
+    Key key,
+    @required this.size,
+    @required Image result,
+    @required Emotion emotion,
+    this.change
+  }) : _result = result, _emotion = emotion, super(key: key);
+
+  final double size;
+  final Image _result;
+  final Emotion _emotion;
+  final bool change;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      child: Column(
+        children: [
+          Stack(
+            alignment: AlignmentDirectional.topCenter,
+            children: [
+              _result,
+              change ?
+                Image.asset('assets/emojies/${_emotion.resolute()}.png', width: size*0.5,)
+              : Visibility(child: Container(), visible: false,)
+            ],
+          ),
+          SizedBox(height: 10,),
+          Text('Resultados', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),),
+          SizedBox(height: 5,),
+          change ?
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: _emotion.toJson()
+              .map((key, value) => 
+              MapEntry(key, Text('${key[0].toUpperCase()}${key.substring(1)}: $value'))).values.toList())
+          : Center(
+            child: CircularProgressIndicator(),
+          )
+        ],
+      ), 
     );
   }
 }
@@ -95,11 +152,12 @@ class ActionCapture extends StatelessWidget {
   final Function(File result) onCapture;
 
   final ImagePicker _picker = ImagePicker();
+  final double width;
 
-  ActionCapture({Key key, this.onCapture}) : super(key: key);
+  ActionCapture({Key key, this.onCapture, this.width}) : super(key: key);
 
   _onCapture(ImageSource source) async {
-    final image = await _picker.getImage(source: source);
+    final image = await _picker.getImage(source: source, maxWidth: width);
     if (image != null) {
       File file = File(image.path);
       onCapture(file);
