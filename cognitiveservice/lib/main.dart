@@ -14,6 +14,9 @@ class FaceSentiment extends StatelessWidget {
       title: 'FaceSentiment',
       theme: ThemeData(
         primarySwatch: Colors.blue,
+        appBarTheme: AppBarTheme(
+          color: Colors.teal,
+        ),
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
       home: MainNavigator(),

@@ -23,20 +23,25 @@ class _CaptureState extends State<Capture> {
   _takePicture() async {
     _change = false;
     _snack.currentState.showSnackBar(SnackBar(
-      content: ActionCapture(width: size, onCapture: (file) async {
-        if (file != null){
-          _onCapture(Image.file(file, width: size,));
-          _emotion = await EmotionApi.instance.emotionReconigtion(file);
-          _change = true;
-          setState(() {});
-        }else {
-          Fluttertoast.showToast(
-              msg: "Error al obtener la imagen",
-              toastLength: Toast.LENGTH_LONG,
-              gravity: ToastGravity.BOTTOM);
-          _onCapture(null);
-        }
-      }),
+      content: ActionCapture(
+          width: size,
+          onCapture: (file) async {
+            if (file != null) {
+              _onCapture(Image.file(
+                file,
+                width: size,
+              ));
+              _emotion = await EmotionApi.instance.emotionReconigtion(file);
+              _change = true;
+              setState(() {});
+            } else {
+              Fluttertoast.showToast(
+                  msg: "Error al obtener la imagen",
+                  toastLength: Toast.LENGTH_LONG,
+                  gravity: ToastGravity.BOTTOM);
+              _onCapture(null);
+            }
+          }),
     ));
   }
 
@@ -52,17 +57,19 @@ class _CaptureState extends State<Capture> {
     return Scaffold(
       key: _snack,
       body: Container(
-        child: Center(
-          child: ListView(
-            children: <Widget>[
-              _result == null ?
-                NotImageFound(size: size)
-              : ResultImageValue(size: size, result: _result, emotion: _emotion, change: _change,)
-            ],
-          ),
-        ),
+        child: _result == null
+            ? NotImageFound(size: size)
+            : Center(
+                child: ResultImageValue(
+                  size: size,
+                  result: _result,
+                  emotion: _emotion,
+                  change: _change,
+                ),
+              ),
       ),
       floatingActionButton: FloatingActionButton(
+        backgroundColor: Colors.teal,
         onPressed: _takePicture,
         child: Icon(Icons.camera),
       ),
@@ -71,80 +78,140 @@ class _CaptureState extends State<Capture> {
 }
 
 class ResultImageValue extends StatelessWidget {
-  const ResultImageValue({
-    Key key,
-    @required this.size,
-    @required Image result,
-    @required Emotion emotion,
-    this.change
-  }) : _result = result, _emotion = emotion, super(key: key);
+  const ResultImageValue(
+      {Key key,
+      @required this.size,
+      @required Image result,
+      @required Emotion emotion,
+      this.change})
+      : _result = result,
+        _emotion = emotion,
+        super(key: key);
 
   final double size;
   final Image _result;
   final Emotion _emotion;
   final bool change;
 
+  MapEntry<String, Text> _buildResults(key, value) {
+    String upper = key[0].toUpperCase();
+    String percent = (value * 100 as double).toStringAsPrecision(2);
+    return MapEntry(
+      key,
+      Text(
+          '$upper${key.substring(1)}: $percent%'));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
       width: size,
-      child: Column(
+      child: ListView(
+        shrinkWrap: true,
         children: [
           Stack(
             alignment: AlignmentDirectional.topCenter,
             children: [
               _result,
-              change ?
-                Image.asset('assets/emojies/${_emotion.resolute()}.png', width: size*0.5,)
-              : Visibility(child: Container(), visible: false,)
+              change
+                  ? Image.asset(
+                      'assets/emojies/${_emotion.resolute()}.png',
+                      width: size * 0.5,
+                    )
+                  : Visibility(
+                      child: Container(),
+                      visible: false,
+                    )
             ],
           ),
-          SizedBox(height: 10,),
-          Text('Resultados', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),),
-          SizedBox(height: 5,),
-          change ?
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: _emotion.toJson()
-              .map((key, value) => 
-              MapEntry(key, Text('${key[0].toUpperCase()}${key.substring(1)}: $value'))).values.toList())
-          : Center(
-            child: CircularProgressIndicator(),
-          )
+          SizedBox(
+            height: 10,
+          ),
+          Text(
+            'Resultados',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          SizedBox(
+            height: 5,
+          ),
+          change
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children:
+                      _emotion.toJson().map(_buildResults).values.toList())
+              : Center(
+                  child: CircularProgressIndicator(),
+                )
         ],
-      ), 
+      ),
     );
   }
+
 }
 
 class NotImageFound extends StatelessWidget {
-  const NotImageFound({
+  NotImageFound({
     Key key,
     @required this.size,
   }) : super(key: key);
 
   final double size;
+  final List<String> emojies = [
+    "anger",
+    "disgust",
+    "fear",
+    "happiness",
+    "neutral",
+    "sadness",
+    "surprise"
+  ];
+
+  Widget _buildEmojie(String emojie) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Image.asset(
+          'assets/emojies/$emojie.png',
+          width: size * 0.5,
+        ),
+        Center(
+          child: Text(emojie),
+        )
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: size,
-      child: Stack(
-        alignment: Alignment.center,
-        children: <Widget>[
-          Icon(
-            Icons.image,
-            size: size,
-            color: Color.fromRGBO(0, 0, 0, 0.2),
+        height: size,
+        child: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.start,
+            children: <Widget>[
+              Center(
+                child: Text(
+                  "¿Quiéres saber que sentimiento expresa tu rostro?",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+              SizedBox(
+                height: 20.0,
+              ),
+              GridView.count(
+                shrinkWrap: true,
+                physics: NeverScrollableScrollPhysics(),
+                childAspectRatio: 1.0,
+                crossAxisCount: 4,
+                children: emojies.map(_buildEmojie).toList(),
+              )
+            ],
           ),
-          Text(
-            "No ha seleccionado una imagen",
-            style: TextStyle(fontSize: 16, color: Colors.blueGrey),
-          )
-        ],
-      ),
-    );
+        ));
   }
 }
 
