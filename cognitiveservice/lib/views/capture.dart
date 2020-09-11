@@ -31,9 +31,15 @@ class _CaptureState extends State<Capture> {
                 file,
                 width: size,
               ));
+              showDialog(
+                  context: context,
+                  child: Center(
+                    child: CircularProgressIndicator(),
+                  ));
               _emotion = await EmotionApi.instance.emotionReconigtion(file);
               _change = true;
               setState(() {});
+              Navigator.pop(context);
             } else {
               Fluttertoast.showToast(
                   msg: "Error al obtener la imagen",
@@ -57,6 +63,7 @@ class _CaptureState extends State<Capture> {
     return Scaffold(
       key: _snack,
       body: Container(
+        padding: EdgeInsets.symmetric(vertical: 10.0),
         child: _result == null
             ? NotImageFound(size: size)
             : Center(
@@ -93,15 +100,6 @@ class ResultImageValue extends StatelessWidget {
   final Emotion _emotion;
   final bool change;
 
-  MapEntry<String, Text> _buildResults(key, value) {
-    String upper = key[0].toUpperCase();
-    String percent = (value * 100 as double).toStringAsPrecision(2);
-    return MapEntry(
-      key,
-      Text(
-          '$upper${key.substring(1)}: $percent%'));
-  }
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -109,13 +107,24 @@ class ResultImageValue extends StatelessWidget {
       child: ListView(
         shrinkWrap: true,
         children: [
+          change
+              ? Padding(
+                  padding: const EdgeInsets.only(bottom: 20.0),
+                  child: Center(
+                      child: Text("${_emotion.compute?.toUpperCase()}",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ))),
+                )
+              : Container(),
           Stack(
             alignment: AlignmentDirectional.topCenter,
             children: [
               _result,
               change
                   ? Image.asset(
-                      'assets/emojies/${_emotion.resolute()}.png',
+                      'assets/emojies/${_emotion.compute}.png',
                       width: size * 0.5,
                     )
                   : Visibility(
@@ -124,30 +133,46 @@ class ResultImageValue extends StatelessWidget {
                     )
             ],
           ),
-          SizedBox(
-            height: 10,
-          ),
-          Text(
-            'Resultados',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-          SizedBox(
-            height: 5,
-          ),
           change
-              ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children:
-                      _emotion.toJson().map(_buildResults).values.toList())
-              : Center(
-                  child: CircularProgressIndicator(),
+              ? ResultView(
+                  emotion: _emotion,
                 )
+              : Container(),
+          IconButton(
+            icon: Icon(Icons.share,),
+            onPressed: () {},
+            color: Colors.teal,
+            tooltip: "Compartir",
+          )
         ],
       ),
     );
   }
+}
 
+class ResultView extends StatelessWidget {
+  const ResultView({Key key, this.emotion}) : super(key: key);
+
+  final Emotion emotion;
+
+  MapEntry<String, Text> _buildResults(key, value) {
+    String upper = key[0].toUpperCase();
+    String percent = (value * 100 as double).toStringAsPrecision(2);
+    return MapEntry(key, Text('$upper${key.substring(1)}: $percent%'));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ExpansionTile(
+      title: Text('Más detalles'),
+      children: <Widget>[
+        Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: emotion.toJson().map(_buildResults).values.toList())
+      ],
+    );
+  }
 }
 
 class NotImageFound extends StatelessWidget {
