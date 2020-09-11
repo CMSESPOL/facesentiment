@@ -1,11 +1,15 @@
 import 'dart:io';
+import 'dart:typed_data';
+import 'dart:ui';
 
+import 'package:cognitiveservice/utils/result_draw.dart';
+import 'package:cognitiveservice/utils/service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../models/sentiment.dart';
-import '../utils/service.dart';
 import 'shared/customs.dart';
 
 class Capture extends StatefulWidget {
@@ -17,8 +21,21 @@ class _CaptureState extends State<Capture> {
   GlobalKey<ScaffoldState> _snack = GlobalKey<ScaffoldState>();
   Image _result;
   double size;
-  Emotion _emotion = Emotion();
+  FaceEmotion _emotion = FaceEmotion();
   bool _change = false;
+
+  _load() {
+    showDialog(
+        context: context,
+        child: Center(
+          child: CircularProgressIndicator(),
+        ));
+  }
+
+  _alert(String msg) {
+    Fluttertoast.showToast(
+        msg: msg, toastLength: Toast.LENGTH_LONG, gravity: ToastGravity.BOTTOM);
+  }
 
   _takePicture() async {
     _change = false;
@@ -31,20 +48,21 @@ class _CaptureState extends State<Capture> {
                 file,
                 width: size,
               ));
-              showDialog(
-                  context: context,
-                  child: Center(
-                    child: CircularProgressIndicator(),
-                  ));
+              _load();
               _emotion = await EmotionApi.instance.emotionReconigtion(file);
-              _change = true;
-              setState(() {});
-              Navigator.pop(context);
+              if (_emotion != null) {
+                _change = true;
+                ByteData bytes = await ResultDrawer().draw(_emotion, file);
+                _onCapture(
+                    Image.memory(Uint8List.view(bytes.buffer), width: size));
+                Navigator.pop(context);
+              } else {
+                Navigator.pop(context);
+                _alert("No se pudo reconocer la emoción");
+                _onCapture(null);
+              }
             } else {
-              Fluttertoast.showToast(
-                  msg: "Error al obtener la imagen",
-                  toastLength: Toast.LENGTH_LONG,
-                  gravity: ToastGravity.BOTTOM);
+              _alert("Error al obtener la imagen");
               _onCapture(null);
             }
           }),
@@ -70,7 +88,7 @@ class _CaptureState extends State<Capture> {
                 child: ResultImageValue(
                   size: size,
                   result: _result,
-                  emotion: _emotion,
+                  emotion: _emotion?.faceAttributes?.emotion,
                   change: _change,
                 ),
               ),
@@ -118,42 +136,39 @@ class ResultImageValue extends StatelessWidget {
                           ))),
                 )
               : Container(),
-          Stack(
-            alignment: AlignmentDirectional.topCenter,
-            children: [
-              _result,
-              change
-                  ? Image.asset(
-                      'assets/emojies/${_emotion.compute}.png',
-                      width: size * 0.5,
-                    )
-                  : Visibility(
-                      child: Container(),
-                      visible: false,
-                    )
-            ],
-          ),
+          _result,
           change
               ? ResultView(
                   emotion: _emotion,
                 )
               : Container(),
-          IconButton(
-            icon: Icon(Icons.share,),
-            onPressed: () {},
-            color: Colors.teal,
-            tooltip: "Compartir",
-          )
+          change
+              ? IconButton(
+                  icon: Icon(
+                    Icons.share,
+                  ),
+                  onPressed: () {},
+                  color: Colors.teal,
+                  tooltip: "Compartir",
+                )
+              : Container()
         ],
       ),
     );
   }
 }
 
-class ResultView extends StatelessWidget {
+class ResultView extends StatefulWidget {
   const ResultView({Key key, this.emotion}) : super(key: key);
 
   final Emotion emotion;
+
+  @override
+  _ResultViewState createState() => _ResultViewState();
+}
+
+class _ResultViewState extends State<ResultView> {
+  String _details = 'Más detalles';
 
   MapEntry<String, Text> _buildResults(key, value) {
     String upper = key[0].toUpperCase();
@@ -164,12 +179,18 @@ class ResultView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ExpansionTile(
-      title: Text('Más detalles'),
+      title: Text(_details),
+      onExpansionChanged: (value) {
+        setState(() {
+          _details = value ? 'Menos detalles' : 'Más detalles';
+        });
+      },
       children: <Widget>[
         Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
-            children: emotion.toJson().map(_buildResults).values.toList())
+            children:
+                widget.emotion.toJson().map(_buildResults).values.toList())
       ],
     );
   }
